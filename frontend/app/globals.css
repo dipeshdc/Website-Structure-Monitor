@@ -1,0 +1,170 @@
+:root {
+  --ink: #1a1a1a;
+  --peach: #f7d7c4;
+  --coral: #ea6d4b;
+  --sand: #fdf6f0;
+  --sky: #c3d6f5;
+  --shadow: rgba(26, 26, 26, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  color: var(--ink);
+  background: radial-gradient(circle at top, var(--sand), var(--peach));
+  min-height: 100vh;
+}
+
+.page {
+  padding: 4rem 6vw 6rem;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 3rem;
+  align-items: center;
+}
+
+.hero-text h1 {
+  font-size: clamp(2.4rem, 4vw, 3.6rem);
+  margin: 0 0 1rem;
+  letter-spacing: -0.02em;
+}
+
+.subhead {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  max-width: 32rem;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.hero-card {
+  background: white;
+  border-radius: 24px;
+  padding: 2rem;
+  box-shadow: 0 30px 60px var(--shadow);
+  position: relative;
+  overflow: hidden;
+  animation: floatIn 0.6s ease-out;
+}
+
+.hero-card::before {
+  content: "";
+  position: absolute;
+  inset: -30% 60% auto -20%;
+  height: 140px;
+  background: linear-gradient(120deg, var(--sky), transparent);
+  opacity: 0.6;
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+  position: relative;
+  z-index: 1;
+}
+
+label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+input {
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #e1dfdc;
+  font-size: 0.95rem;
+}
+
+button {
+  padding: 0.8rem 1rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--coral);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px var(--shadow);
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.result {
+  margin-top: 1.5rem;
+  background: var(--sand);
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+.status {
+  font-weight: 700;
+  margin: 0 0 1rem;
+}
+
+.status.safe {
+  color: #2b6a3d;
+}
+
+.status.danger {
+  color: #a33a2c;
+}
+
+.meta {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.meta span {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6f6b66;
+}
+
+.error {
+  color: #a33a2c;
+  margin-top: 1rem;
+}
+
+@keyframes floatIn {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 3rem 6vw;
+  }
+
+  .hero-card {
+    padding: 1.6rem;
+  }
+}
