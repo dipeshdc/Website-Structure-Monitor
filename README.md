@@ -33,6 +33,12 @@ npm run dev
 
 Set `NEXT_PUBLIC_API_BASE` to point to the backend if it is not running on `http://localhost:8000`.
 
+## Monitoring workflow
+
+- Create persistent monitors from the dashboard and let the scheduler run checks every minute.
+- Use **Check now** for an immediate run.
+- Use **Simulate change** to force a test-mode failure, then **Revert** to return to normal.
+
 ## Tests
 
 ```bash
