@@ -11,9 +11,12 @@ logger = logging.getLogger(__name__)
 def fetch_html(url: str) -> str:
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page()
-        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        context = browser.new_context(ignore_https_errors=True)
+        page = context.new_page()
+        page.goto(url, wait_until="networkidle", timeout=30000)
+        page.wait_for_timeout(1000)
         html = page.content()
+        context.close()
         browser.close()
     return html
 

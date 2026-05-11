@@ -3,24 +3,251 @@
 import { useEffect, useMemo, useState } from "react";
 
 const DEFAULT_API = "http://localhost:8000";
+const TARGET_URL = "http://localhost:3000";
 
 export default function Home() {
-  const [name, setName] = useState("");
-  const [url, setUrl] = useState("");
-  const [selector, setSelector] = useState("");
-  const [interval, setInterval] = useState(60);
-  const [monitors, setMonitors] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [error, setError] = useState("");
+  const [testPanelVisible, setTestPanelVisible] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const cookie = document.cookie.split("; ").find(c => c.startsWith("hidePanelTest="));
+    return !cookie;
+  });
+
+  const [testContentVisible, setTestContentVisible] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const cookie = document.cookie.split("; ").find(c => c.startsWith("hideContentTest="));
+    return !cookie;
+  });
+
+  const [status, setStatus] = useState(null);
+  const [lastChecked, setLastChecked] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const apiBase = useMemo(() => {
     return process.env.NEXT_PUBLIC_API_BASE || DEFAULT_API;
   }, []);
 
   useEffect(() => {
+    const panelCookie = document.cookie.split("; ").find(c => c.startsWith("hidePanelTest="));
+    const contentCookie = document.cookie.split("; ").find(c => c.startsWith("hideContentTest="));
+    setTestPanelVisible(!panelCookie);
+    setTestContentVisible(!contentCookie);
+  }, []);
+
+  async function checkStructure() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`${apiBase}/monitor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: TARGET_URL,
+          selector: ".test-content"
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Check failed");
+      }
+
+      const data = await response.json();
+      setStatus(data);
+      setLastChecked(new Date().toLocaleTimeString());
+    } catch (err) {
+      setError("Failed to check structure");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    checkStructure();
+    const interval = setInterval(checkStructure, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  function setCookie(name, value) {
+    const date = new Date();
+    date.setTime(date.getTime() + 365 * 24 * 60 * 60 * 1000);
+    document.cookie = `${name}=${value};expires=${date.toUTCString()};path=/`;
+  }
+
+  function toggleTestPanel() {
+    const newState = !testPanelVisible;
+    if (newState) {
+      document.cookie = "hidePanelTest=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
+    } else {
+      setCookie("hidePanelTest", "true");
+    }
+    setTestPanelVisible(newState);
+  }
+
+  function toggleTestContent() {
+    const newState = !testContentVisible;
+    if (newState) {
+      document.cookie = "hideContentTest=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
+    } else {
+      setCookie("hideContentTest", "true");
+    }
+    setTestContentVisible(newState);
+  }
+
+  function resetTestPanel() {
+    document.cookie = "hidePanelTest=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
+    document.cookie = "hideContentTest=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
+    setTestPanelVisible(true);
+    setTestContentVisible(true);
+  }
+
+  return (
+    <main className="page simple">
+      <section className="status-section">
+        <div className="status-card">
+          <h1>Structure Monitor</h1>
+          <p className="target">Monitoring: <code>{TARGET_URL}</code></p>
+
+          <div className="status-display">
+            {status ? (
+              <>
+                <div className={`status-badge ${status.changed ? "changed" : "stable"}`}>
+                  {status.changed ? "⚠️ CHANGED" : "✓ STABLE"}
+                </div>
+                <p className="status-message">{status.message}</p>
+                <div className="status-details">
+                  <div>
+                    <span>Current Hash:</span>
+                    <code>{status.current_hash?.slice(0, 12)}...</code>
+                  </div>
+                  <div>
+                    <span>Last Checked:</span>
+                    <span>{lastChecked}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p>Loading initial check...</p>
+            )}
+          </div>
+
+          <button 
+            onClick={checkStructure} 
+            disabled={loading}
+            className="check-btn"
+          >
+            {loading ? "Checking..." : "Check Now"}
+          </button>
+
+          {error && <p className="error">{error}</p>}
+        </div>
+      </section>
+
+      <section className="test-section">
+        <div className="test-card">
+          <h2>🧪 Test Controls</h2>
+          <p>Toggle elements below to change the DOM structure.</p>
+          <p className="auto-check">Auto-checks every 60 seconds</p>
+
+          <div className="test-controls">
+            <button 
+              type="button" 
+              className={testPanelVisible ? "test-btn active" : "test-btn"}
+              onClick={toggleTestPanel}
+            >
+              {testPanelVisible ? "✓" : "✗"} Panel Visible
+            </button>
+            <button 
+              type="button" 
+              className={testContentVisible ? "test-btn active" : "test-btn"}
+              onClick={toggleTestContent}
+            >
+              {testContentVisible ? "✓" : "✗"} Content Visible
+            </button>
+            <button 
+              type="button" 
+              className="test-btn reset"
+              onClick={resetTestPanel}
+            >
+              Reset All
+            </button>
+          </div>
+
+          {testPanelVisible && (
+            <div className="test-content">
+              <div className="test-section-item">
+                <h3>Test Section A</h3>
+                <p>Always visible test element.</p>
+              </div>
+              {testContentVisible && (
+                <div className="test-section-item">
+                  <h3>Test Section B</h3>
+                  <p>Toggle "Content Visible" to hide/show this section.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+  const [testPanelVisible, setTestPanelVisible] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const cookie = document.cookie.split("; ").find(c => c.startsWith("hidePanelTest="));
+    return !cookie;
+  });
+
+  const [testContentVisible, setTestContentVisible] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const cookie = document.cookie.split("; ").find(c => c.startsWith("hideContentTest="));
+    return !cookie;
+  });
+
+  const apiBase = useMemo(() => {
+    return process.env.NEXT_PUBLIC_API_BASE || DEFAULT_API;
+  }, []);
+
+  useEffect(() => {
+    const panelCookie = document.cookie.split("; ").find(c => c.startsWith("hidePanelTest="));
+    const contentCookie = document.cookie.split("; ").find(c => c.startsWith("hideContentTest="));
+    setTestPanelVisible(!panelCookie);
+    setTestContentVisible(!contentCookie);
     fetchMonitors();
   }, []);
+
+  function setCookie(name, value, days = 365) {
+    const date = new Date();
+    date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+    const expires = "expires=" + date.toUTCString();
+    document.cookie = `${name}=${value};${expires};path=/`;
+  }
+
+  function toggleTestPanel() {
+    const newState = !testPanelVisible;
+    if (newState) {
+      document.cookie = "hidePanelTest=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
+    } else {
+      setCookie("hidePanelTest", "true");
+    }
+    setTestPanelVisible(newState);
+  }
+
+  function toggleTestContent() {
+    const newState = !testContentVisible;
+    if (newState) {
+      document.cookie = "hideContentTest=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
+    } else {
+      setCookie("hideContentTest", "true");
+    }
+    setTestContentVisible(newState);
+  }
+
+  function resetTestPanel() {
+    document.cookie = "hidePanelTest=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
+    document.cookie = "hideContentTest=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
+    setTestPanelVisible(true);
+    setTestContentVisible(true);
+  }
 
   async function fetchMonitors() {
     try {
@@ -135,8 +362,96 @@ export default function Home() {
   }
 
   return (
-    <main className="page">
-      <section className="hero">
+    <main className="page simple">
+      <section className="status-section">
+        <div className="status-card">
+          <h1>Structure Monitor</h1>
+          <p className="target">Monitoring: <code>{TARGET_URL}</code></p>
+
+          <div className="status-display">
+            {status ? (
+              <>
+                <div className={`status-badge ${status.changed ? "changed" : "stable"}`}>
+                  {status.changed ? "⚠️ CHANGED" : "✓ STABLE"}
+                </div>
+                <p className="status-message">{status.message}</p>
+                <div className="status-details">
+                  <div>
+                    <span>Current Hash:</span>
+                    <code>{status.current_hash?.slice(0, 12)}...</code>
+                  </div>
+                  <div>
+                    <span>Last Checked:</span>
+                    <span>{lastChecked}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p>Loading initial check...</p>
+            )}
+          </div>
+
+          <button 
+            onClick={checkStructure} 
+            disabled={loading}
+            className="check-btn"
+          >
+            {loading ? "Checking..." : "Check Now"}
+          </button>
+
+          {error && <p className="error">{error}</p>}
+        </div>
+      </section>
+
+      <section className="test-section">
+        <div className="test-card">
+          <h2>🧪 Test Controls</h2>
+          <p>Toggle elements below to change the DOM structure.</p>
+          <p className="auto-check">Auto-checks every 60 seconds</p>
+
+          <div className="test-controls">
+            <button 
+              type="button" 
+              className={testPanelVisible ? "test-btn active" : "test-btn"}
+              onClick={toggleTestPanel}
+            >
+              {testPanelVisible ? "✓" : "✗"} Panel Visible
+            </button>
+            <button 
+              type="button" 
+              className={testContentVisible ? "test-btn active" : "test-btn"}
+              onClick={toggleTestContent}
+            >
+              {testContentVisible ? "✓" : "✗"} Content Visible
+            </button>
+            <button 
+              type="button" 
+              className="test-btn reset"
+              onClick={resetTestPanel}
+            >
+              Reset All
+            </button>
+          </div>
+
+          {testPanelVisible && (
+            <div className="test-content">
+              <div className="test-section-item">
+                <h3>Test Section A</h3>
+                <p>Always visible test element.</p>
+              </div>
+              {testContentVisible && (
+                <div className="test-section-item">
+                  <h3>Test Section B</h3>
+                  <p>Toggle "Content Visible" to hide/show this section.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
         <div className="hero-text">
           <p className="eyebrow">Website Structure Monitoring Tool</p>
           <h1>Structure change dashboard</h1>
@@ -277,6 +592,70 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      <section className="dashboard test-panel">
+        <div className="panel full">
+          <h2>🧪 Test Panel (Local)</h2>
+          <p>Toggle elements below to change the DOM structure. Monitor <strong>http://localhost:3000</strong> to detect changes.</p>
+          <div className="test-controls">
+            <button 
+              type="button" 
+              className={testPanelVisible ? "test-btn active" : "test-btn"}
+              onClick={toggleTestPanel}
+            >
+              {testPanelVisible ? "✓" : "✗"} Panel Visible
+            </button>
+            <button 
+              type="button" 
+              className={testContentVisible ? "test-btn active" : "test-btn"}
+              onClick={toggleTestContent}
+            >
+              {testContentVisible ? "✓" : "✗"} Content Visible
+            </button>
+            <button 
+              type="button" 
+              className="test-btn reset"
+              onClick={resetTestPanel}
+            >
+              Reset All
+            </button>
+          </div>
+
+          {testPanelVisible && (
+            <div className="test-content">
+              <div className="test-section">
+                <h3>Test Section A</h3>
+                <p>This is a test element that can be toggled on and off.</p>
+              </div>
+              {testContentVisible && (
+                <div className="test-section">
+                  <h3>Test Section B</h3>
+                  <p>Toggle "Content Visible" to hide/show this section and detect DOM changes.</p>
+                  <ul>
+                    <li>Item 1</li>
+                    <li>Item 2</li>
+                    <li>Item 3</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="test-help">
+            <strong>How to test:</strong>
+            <ol>
+              <li>Create a monitor with URL: <code>http://localhost:3000</code></li>
+              <li>Use selector: <code>.test-content</code> or leave empty for full page</li>
+              <li>Click "Check now" to establish baseline</li>
+              <li>Toggle buttons above to change DOM structure</li>
+              <li>Click "Check now" → Should show "Structure changed"</li>
+              <li>Click same toggle to restore original</li>
+              <li>Click "Check now" → Should show "No change detected"</li>
+            </ol>
+          </div>
+        </div>
+      </section>
     </main>
   );
+
 }
