@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import time
 from typing import Tuple
 
 from bs4 import BeautifulSoup
@@ -9,16 +10,54 @@ logger = logging.getLogger(__name__)
 
 
 def fetch_html(url: str) -> str:
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        context = browser.new_context(ignore_https_errors=True)
-        page = context.new_page()
-        page.goto(url, wait_until="networkidle", timeout=30000)
-        page.wait_for_timeout(1000)
-        html = page.content()
-        context.close()
-        browser.close()
-    return html
+    """Fetch HTML with retry logic for transient errors."""
+    max_retries = 2
+    retry_delay = 2  # seconds
+    
+    # Check if URL is local
+    is_local = any(x in url for x in ["localhost", "127.0.0.1", "0.0.0.0", "[::1]"])
+    
+    for attempt in range(max_retries + 1):
+        try:
+            with sync_playwright() as p:
+                launch_args = {}
+                if is_local:
+                    launch_args["args"] = ["--ignore-certificate-errors", "--disable-web-resources"]
+                browser = p.chromium.launch(**launch_args)
+                try:
+                    context = browser.new_context(ignore_https_errors=True)
+                    page = context.new_page()
+                    try:
+                        # Disable caching to ensure fresh content
+                        page.context.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
+                        # Wait for full page load including JavaScript
+                        page.goto(url, wait_until="networkidle", timeout=45000)
+                        # Additional wait for React/JS framework updates
+                        page.wait_for_timeout(1000)
+                        html = page.content()
+                        logger.info(f"Fetched {url} - HTML length: {len(html)} bytes")
+                        return html
+                    finally:
+                        page.close()
+                finally:
+                    context.close()
+                    browser.close()
+        except Exception as e:
+            error_str = str(e)
+            is_transient = any(x in error_str for x in [
+                "TargetClosedError",
+                "ERR_ABORTED",
+                "frame was detached",
+                "Connection lost"
+            ])
+            
+            if is_transient and attempt < max_retries:
+                logger.warning(f"Transient error on attempt {attempt + 1}, retrying in {retry_delay}s: {error_str}")
+                time.sleep(retry_delay)
+                continue
+            
+            logger.error(f"Failed to fetch {url} after {attempt + 1} attempt(s): {error_str}")
+            raise
 
 
 def extract_structure(html: str, selector: str | None) -> Tuple[str | None, bool]:
@@ -38,7 +77,16 @@ def extract_structure(html: str, selector: str | None) -> Tuple[str | None, bool
     if not parts:
         return None, True
 
-    return "|".join(parts), False
+    # Get full text content of the selected area
+    full_text = root.get_text()
+    
+    # Combine structure and content
+    structure_str = "|".join(parts)
+    combined = f"{structure_str}|||{full_text}"
+    
+    logger.debug(f"extract_structure: selector={selector}, parts_count={len(parts)}, text_length={len(full_text)}")
+    
+    return combined, False
 
 
 def compute_hash(structure: str | None) -> str | None:
@@ -54,4 +102,6 @@ def run_check(url: str, selector: str | None) -> Tuple[str | None, bool]:
     current_hash = compute_hash(structure)
     if missing:
         logger.warning("Missing data for url=%s selector=%s", url, selector)
+    if structure:
+        logger.info(f"Extracted content (first 500 chars): {structure[:500]}")
     return current_hash, missing

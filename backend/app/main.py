@@ -239,6 +239,7 @@ def perform_check(monitor_id: int) -> dict:
         changed = False
 
     checked_at = datetime.utcnow().isoformat()
+    logger.info(f"Monitor {monitor_id}: prev_hash={previous_hash}, current_hash={current_hash}, changed={changed}, missing={missing}")
     update_monitor_status(monitor_id, current_hash, checked_at)
     log_check(
         monitor_id,
