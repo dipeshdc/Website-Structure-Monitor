@@ -77,14 +77,16 @@ def extract_structure(html: str, selector: str | None) -> Tuple[str | None, bool
     if not parts:
         return None, True
 
-    # Get full text content of the selected area
+    # Get full text content and normalize whitespace
     full_text = root.get_text()
+    # Normalize whitespace: collapse multiple spaces and strip
+    normalized_text = " ".join(full_text.split())
     
     # Combine structure and content
     structure_str = "|".join(parts)
-    combined = f"{structure_str}|||{full_text}"
+    combined = f"{structure_str}|||{normalized_text}"
     
-    logger.debug(f"extract_structure: selector={selector}, parts_count={len(parts)}, text_length={len(full_text)}")
+    logger.debug(f"extract_structure: selector={selector}, parts_count={len(parts)}, text_length={len(normalized_text)}")
     
     return combined, False
 
